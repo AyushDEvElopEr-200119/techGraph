@@ -1,6 +1,6 @@
 import type { Developer, DeveloperDetails, RecommendedJob, Project, Technology, Job, HealthStatus } from "../types";
 
-const API_BASE_URL = "http://localhost:5000/api";
+const API_BASE_URL = "https://techgraph-1.onrender.com/api";
 
 export async function getDevelopers(): Promise<Developer[]> {
   const response = await fetch(`${API_BASE_URL}/developers`);
