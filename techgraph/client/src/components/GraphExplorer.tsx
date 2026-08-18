@@ -2,10 +2,16 @@ import React, { useRef, useEffect, useState, useMemo, useCallback } from "react"
 import {
   ZoomIn,
   ZoomOut,
-  RotateCcw,
+  Maximize2,
+  Play,
+  Pause,
   Search,
   X,
   ExternalLink,
+  Layers,
+  Network,
+  Orbit,
+  Sliders,
 } from "lucide-react";
 import type {
   Developer,
@@ -27,51 +33,60 @@ interface GraphExplorerProps {
   initialSelectedNodeId?: string | null;
 }
 
-// Muted, natural human-designed colors for each node type
+type LayoutMode = "force" | "columns" | "radial";
+
+// Refined semantic palettes with high contrast and crisp borders
 const TYPE_CONFIG: Record<
   NodeType,
   {
     color: string;
     bg: string;
     border: string;
-    radius: number;
+    badge: string;
+    icon: string;
   }
 > = {
   Developer: {
-    color: "#225C4D",
-    bg: "#EBF3F0",
-    border: "#BCD8CF",
-    radius: 20,
+    color: "#1E5E4E",
+    bg: "#EDF6F3",
+    border: "#9BC5B7",
+    badge: "DEV",
+    icon: "👤",
   },
   Skill: {
-    color: "#2A526E",
-    bg: "#E8F1F7",
-    border: "#BFD7E6",
-    radius: 17,
+    color: "#245373",
+    bg: "#EDF4F9",
+    border: "#A5C5DB",
+    badge: "SKILL",
+    icon: "⚡",
   },
   Technology: {
-    color: "#505832",
-    bg: "#F0F3E8",
-    border: "#D1D8C0",
-    radius: 18,
+    color: "#545D33",
+    bg: "#F2F5E8",
+    border: "#C2CDA5",
+    badge: "TECH",
+    icon: "⚙️",
   },
   Project: {
-    color: "#7D4314",
-    bg: "#FAF0E6",
-    border: "#E8CFBA",
-    radius: 19,
+    color: "#844715",
+    bg: "#FDF2E9",
+    border: "#E0B794",
+    badge: "PROJ",
+    icon: "📦",
   },
   Company: {
-    color: "#504462",
-    bg: "#F2EFF7",
-    border: "#D3C9E2",
-    radius: 18,
+    color: "#544669",
+    bg: "#F3EFF8",
+    border: "#C2B2D6",
+    badge: "CORP",
+    icon: "🏢",
   },
   Job: {
-    color: "#752E2E",
-    bg: "#F9EDED",
-    border: "#E5C3C3",
-    radius: 19,
+    color: "#7E2E2E",
+    bg: "#FDF0F0",
+    border: "#DE9F9F",
+    badge: "JOB",
+    icon: "💼",
   },
 };
 
@@ -81,21 +96,26 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
   technologies,
   jobs,
   onSelectDeveloper,
-  height = 580,
+  height = 620,
   initialSelectedNodeId = null,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const [activeFilter, setActiveFilter] = useState<NodeType | "ALL">("ALL");
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>("force");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
+  const [isPhysicsRunning, setIsPhysicsRunning] = useState(true);
+  const [spacingMultiplier, setSpacingMultiplier] = useState(1.4);
 
-  const transformRef = useRef({ x: 0, y: 0, scale: 0.95 });
+  const transformRef = useRef({ x: 0, y: 0, scale: 0.85 });
   const isDraggingCanvasRef = useRef(false);
   const dragStartRef = useRef({ x: 0, y: 0 });
   const draggedNodeRef = useRef<GraphNode | null>(null);
+  const simNodesRef = useRef<GraphNode[]>([]);
+  const simLinksRef = useRef<GraphLink[]>([]);
 
   // Construct graph nodes and links from real application data
   const { rawNodes, rawLinks } = useMemo(() => {
@@ -111,7 +131,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
         type: "Developer",
         subtitle: `${d.experience} yrs • ${d.location}`,
         meta: d,
-        radius: TYPE_CONFIG.Developer.radius,
+        radius: 28,
       });
 
       if (d.skills) {
@@ -122,9 +142,9 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
               id: skillId,
               name: s.name,
               type: "Skill",
-              subtitle: "Verified Skill",
+              subtitle: "Skill",
               meta: s,
-              radius: TYPE_CONFIG.Skill.radius,
+              radius: 24,
             });
           }
           links.push({ source: id, target: skillId, label: "HAS_SKILL" });
@@ -141,7 +161,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
               type: "Project",
               subtitle: `${p.year}`,
               meta: p,
-              radius: TYPE_CONFIG.Project.radius,
+              radius: 26,
             });
           }
           links.push({ source: id, target: projId, label: "WORKED_ON" });
@@ -158,7 +178,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
               type: "Company",
               subtitle: `${c.industry} • ${c.location}`,
               meta: c,
-              radius: TYPE_CONFIG.Company.radius,
+              radius: 26,
             });
           }
           links.push({ source: id, target: compId, label: "WORKED_AT" });
@@ -176,7 +196,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
           type: "Project",
           subtitle: `${p.year}`,
           meta: p,
-          radius: TYPE_CONFIG.Project.radius,
+          radius: 26,
         });
       }
 
@@ -189,7 +209,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
               name: tName,
               type: "Technology",
               subtitle: "Tech Stack",
-              radius: TYPE_CONFIG.Technology.radius,
+              radius: 24,
             });
           }
           links.push({ source: projId, target: techId, label: "USES" });
@@ -224,7 +244,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
           type: "Technology",
           subtitle: t.category,
           meta: t,
-          radius: TYPE_CONFIG.Technology.radius,
+          radius: 24,
         });
       } else {
         const n = nodesMap.get(techId)!;
@@ -242,7 +262,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
         type: "Job",
         subtitle: `${j.company || ""} • ${j.location}`,
         meta: j,
-        radius: TYPE_CONFIG.Job.radius,
+        radius: 26,
       });
 
       if (j.company) {
@@ -253,7 +273,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
             name: j.company,
             type: "Company",
             subtitle: j.location,
-            radius: TYPE_CONFIG.Company.radius,
+            radius: 26,
           });
         }
         links.push({ source: compId, target: jobId, label: "OFFERS" });
@@ -268,7 +288,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
               name: sName,
               type: "Skill",
               subtitle: "Required Skill",
-              radius: TYPE_CONFIG.Skill.radius,
+              radius: 24,
             });
           }
           links.push({ source: jobId, target: skillId, label: "REQUIRES" });
@@ -282,60 +302,126 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
     };
   }, [developers, projects, technologies, jobs]);
 
-  const simNodesRef = useRef<GraphNode[]>([]);
-  const simLinksRef = useRef<GraphLink[]>([]);
+  // Apply layout positions (Force, Columns, Radial)
+  const applyLayout = useCallback(
+    (mode: LayoutMode, mult: number) => {
+      const typeBuckets: Record<NodeType, GraphNode[]> = {
+        Developer: [],
+        Skill: [],
+        Technology: [],
+        Project: [],
+        Company: [],
+        Job: [],
+      };
 
-  // Initialize node layout positions
-  useEffect(() => {
-    const layerOffsets: Record<NodeType, { radius: number; angleOffset: number }> = {
-      Developer: { radius: 100, angleOffset: 0 },
-      Skill: { radius: 210, angleOffset: 0.3 },
-      Technology: { radius: 310, angleOffset: 0.6 },
-      Project: { radius: 280, angleOffset: -0.8 },
-      Company: { radius: 230, angleOffset: -0.4 },
-      Job: { radius: 370, angleOffset: -0.2 },
-    };
-
-    const typeBuckets: Record<NodeType, GraphNode[]> = {
-      Developer: [],
-      Skill: [],
-      Technology: [],
-      Project: [],
-      Company: [],
-      Job: [],
-    };
-
-    rawNodes.forEach((node) => {
-      typeBuckets[node.type]?.push(node);
-    });
-
-    const initializedNodes: GraphNode[] = [];
-
-    (Object.keys(typeBuckets) as NodeType[]).forEach((type) => {
-      const group = typeBuckets[type];
-      const cfg = layerOffsets[type];
-      const step = (Math.PI * 2) / Math.max(group.length, 1);
-
-      group.forEach((node, idx) => {
-        const angle = cfg.angleOffset + idx * step;
-        initializedNodes.push({
-          ...node,
-          x: Math.cos(angle) * cfg.radius + (Math.random() * 20 - 10),
-          y: Math.sin(angle) * cfg.radius + (Math.random() * 20 - 10),
-          vx: 0,
-          vy: 0,
-        });
+      rawNodes.forEach((node) => {
+        typeBuckets[node.type]?.push(node);
       });
-    });
 
-    simNodesRef.current = initializedNodes;
-    simLinksRef.current = rawLinks;
-  }, [rawNodes, rawLinks]);
+      const updatedNodes: GraphNode[] = [];
+
+      if (mode === "columns") {
+        // Structured Pipeline Columns (Left to Right)
+        const order: NodeType[] = [
+          "Developer",
+          "Skill",
+          "Technology",
+          "Project",
+          "Company",
+          "Job",
+        ];
+        const colWidth = 220 * mult;
+        const startX = -((order.length - 1) * colWidth) / 2;
+
+        order.forEach((type, colIdx) => {
+          const group = typeBuckets[type] || [];
+          const totalInCol = group.length;
+          const colX = startX + colIdx * colWidth;
+          const rowSpacing = Math.min(100 * mult, 700 / Math.max(totalInCol, 1));
+          const startY = -((totalInCol - 1) * rowSpacing) / 2;
+
+          group.forEach((node, rowIdx) => {
+            updatedNodes.push({
+              ...node,
+              x: colX,
+              y: startY + rowIdx * rowSpacing,
+              vx: 0,
+              vy: 0,
+            });
+          });
+        });
+      } else if (mode === "radial") {
+        // Concentric Orbits
+        const orbits: Record<NodeType, number> = {
+          Developer: 120 * mult,
+          Skill: 260 * mult,
+          Technology: 390 * mult,
+          Project: 330 * mult,
+          Company: 460 * mult,
+          Job: 520 * mult,
+        };
+
+        (Object.keys(typeBuckets) as NodeType[]).forEach((type) => {
+          const group = typeBuckets[type] || [];
+          const orbitRadius = orbits[type] || 250;
+          const step = (Math.PI * 2) / Math.max(group.length, 1);
+
+          group.forEach((node, idx) => {
+            const angle = idx * step + (type === "Project" ? 0.3 : 0);
+            updatedNodes.push({
+              ...node,
+              x: Math.cos(angle) * orbitRadius,
+              y: Math.sin(angle) * orbitRadius,
+              vx: 0,
+              vy: 0,
+            });
+          });
+        });
+      } else {
+        // Organic Force Network: Wide, spacious initial circle distribution
+        const orbits: Record<NodeType, number> = {
+          Developer: 160 * mult,
+          Skill: 320 * mult,
+          Technology: 450 * mult,
+          Project: 380 * mult,
+          Company: 420 * mult,
+          Job: 510 * mult,
+        };
+
+        (Object.keys(typeBuckets) as NodeType[]).forEach((type) => {
+          const group = typeBuckets[type] || [];
+          const orbitRadius = orbits[type] || 300;
+          const step = (Math.PI * 2) / Math.max(group.length, 1);
+
+          group.forEach((node, idx) => {
+            const angle = idx * step + (Math.random() * 0.2 - 0.1);
+            updatedNodes.push({
+              ...node,
+              x: Math.cos(angle) * orbitRadius + (Math.random() * 30 - 15),
+              y: Math.sin(angle) * orbitRadius + (Math.random() * 30 - 15),
+              vx: (Math.random() - 0.5) * 2,
+              vy: (Math.random() - 0.5) * 2,
+            });
+          });
+        });
+      }
+
+      simNodesRef.current = updatedNodes;
+      simLinksRef.current = rawLinks;
+    },
+    [rawNodes, rawLinks]
+  );
+
+  useEffect(() => {
+    applyLayout(layoutMode, spacingMultiplier);
+  }, [applyLayout, layoutMode, spacingMultiplier]);
 
   useEffect(() => {
     if (initialSelectedNodeId) {
       const match = simNodesRef.current.find(
-        (n) => n.id === initialSelectedNodeId || n.name.toLowerCase() === initialSelectedNodeId.toLowerCase()
+        (n) =>
+          n.id === initialSelectedNodeId ||
+          n.name.toLowerCase() === initialSelectedNodeId.toLowerCase()
       );
       if (match) {
         setSelectedNode(match);
@@ -343,7 +429,45 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
     }
   }, [initialSelectedNodeId]);
 
-  // Clean Canvas Render Loop
+  // Fit View to Canvas bounds
+  const handleFitView = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || simNodesRef.current.length === 0) return;
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+
+    simNodesRef.current.forEach((n) => {
+      const nx = n.x || 0;
+      const ny = n.y || 0;
+      if (nx < minX) minX = nx;
+      if (nx > maxX) maxX = nx;
+      if (ny < minY) minY = ny;
+      if (ny > maxY) maxY = ny;
+    });
+
+    const graphWidth = maxX - minX + 240;
+    const graphHeight = maxY - minY + 240;
+    const canvasWidth = canvas.width || 900;
+    const canvasHeight = canvas.height || 600;
+
+    const scaleX = canvasWidth / graphWidth;
+    const scaleY = canvasHeight / graphHeight;
+    const fitScale = Math.min(Math.max(Math.min(scaleX, scaleY) * 0.9, 0.45), 1.25);
+
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    transformRef.current = {
+      x: -centerX * fitScale,
+      y: -centerY * fitScale,
+      scale: fitScale,
+    };
+  }, []);
+
+  // Main Canvas Render & Physics Loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -358,87 +482,90 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
       const cx = width / 2;
       const cy = height / 2;
 
-      // Clean canvas background
+      // Pure crisp white background
       ctx.fillStyle = "#FFFFFF";
       ctx.fillRect(0, 0, width, height);
 
       const nodes = simNodesRef.current;
       const links = simLinksRef.current;
 
-      // Repulsion
-      for (let i = 0; i < nodes.length; i++) {
-        for (let j = i + 1; j < nodes.length; j++) {
-          const n1 = nodes[i];
-          const n2 = nodes[j];
-          const dx = (n1.x || 0) - (n2.x || 0);
-          const dy = (n1.y || 0) - (n2.y || 0);
-          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          const minDist = (n1.radius || 18) + (n2.radius || 18) + 42;
+      // Physics Simulation (only when running & in force mode)
+      if (isPhysicsRunning && layoutMode === "force") {
+        // Strong Repulsion (Coulomb Anti-collision)
+        for (let i = 0; i < nodes.length; i++) {
+          for (let j = i + 1; j < nodes.length; j++) {
+            const n1 = nodes[i];
+            const n2 = nodes[j];
+            const dx = (n1.x || 0) - (n2.x || 0);
+            const dy = (n1.y || 0) - (n2.y || 0);
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            const minDist = 110 * spacingMultiplier;
 
-          if (dist < 320) {
-            const force = (minDist * minDist) / (dist * dist * 14);
+            if (dist < 600) {
+              const force = (minDist * minDist * 4.5) / (dist * dist * 1.8);
+              const fx = (dx / dist) * force;
+              const fy = (dy / dist) * force;
+
+              if (n1 !== draggedNodeRef.current) {
+                n1.vx = (n1.vx || 0) + fx;
+                n1.vy = (n1.vy || 0) + fy;
+              }
+              if (n2 !== draggedNodeRef.current) {
+                n2.vx = (n2.vx || 0) - fx;
+                n2.vy = (n2.vy || 0) - fy;
+              }
+            }
+          }
+        }
+
+        // Link Attraction (Spring Force)
+        links.forEach((link) => {
+          const sourceNode = nodes.find((n) => n.id === link.source);
+          const targetNode = nodes.find((n) => n.id === link.target);
+
+          if (sourceNode && targetNode) {
+            const dx = (targetNode.x || 0) - (sourceNode.x || 0);
+            const dy = (targetNode.y || 0) - (sourceNode.y || 0);
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            const idealDist = 210 * spacingMultiplier;
+            const force = (dist - idealDist) * 0.005;
+
             const fx = (dx / dist) * force;
             const fy = (dy / dist) * force;
 
-            if (n1 !== draggedNodeRef.current) {
-              n1.vx = (n1.vx || 0) + fx;
-              n1.vy = (n1.vy || 0) + fy;
+            if (sourceNode !== draggedNodeRef.current) {
+              sourceNode.vx = (sourceNode.vx || 0) + fx;
+              sourceNode.vy = (sourceNode.vy || 0) + fy;
             }
-            if (n2 !== draggedNodeRef.current) {
-              n2.vx = (n2.vx || 0) - fx;
-              n2.vy = (n2.vy || 0) - fy;
+            if (targetNode !== draggedNodeRef.current) {
+              targetNode.vx = (targetNode.vx || 0) - fx;
+              targetNode.vy = (targetNode.vy || 0) - fy;
             }
           }
-        }
+        });
+
+        // Gentle Center Gravity & Damping
+        nodes.forEach((node) => {
+          if (node === draggedNodeRef.current) return;
+          const distToCenter = Math.sqrt((node.x || 0) ** 2 + (node.y || 0) ** 2);
+          const centerForce = distToCenter * 0.00015;
+          node.vx = ((node.vx || 0) - (node.x || 0) * centerForce) * 0.86;
+          node.vy = ((node.vy || 0) - (node.y || 0) * centerForce) * 0.86;
+
+          node.x = (node.x || 0) + (node.vx || 0);
+          node.y = (node.y || 0) + (node.vy || 0);
+        });
       }
-
-      // Attraction
-      links.forEach((link) => {
-        const sourceNode = nodes.find((n) => n.id === link.source);
-        const targetNode = nodes.find((n) => n.id === link.target);
-
-        if (sourceNode && targetNode) {
-          const dx = (targetNode.x || 0) - (sourceNode.x || 0);
-          const dy = (targetNode.y || 0) - (sourceNode.y || 0);
-          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          const idealDist = 125;
-          const force = (dist - idealDist) * 0.007;
-
-          const fx = (dx / dist) * force;
-          const fy = (dy / dist) * force;
-
-          if (sourceNode !== draggedNodeRef.current) {
-            sourceNode.vx = (sourceNode.vx || 0) + fx;
-            sourceNode.vy = (sourceNode.vy || 0) + fy;
-          }
-          if (targetNode !== draggedNodeRef.current) {
-            targetNode.vx = (targetNode.vx || 0) - fx;
-            targetNode.vy = (targetNode.vy || 0) - fy;
-          }
-        }
-      });
-
-      // Damping
-      nodes.forEach((node) => {
-        if (node === draggedNodeRef.current) return;
-        const distToCenter = Math.sqrt((node.x || 0) ** 2 + (node.y || 0) ** 2);
-        const centerForce = distToCenter * 0.0008;
-        node.vx = ((node.vx || 0) - (node.x || 0) * centerForce) * 0.88;
-        node.vy = ((node.vy || 0) - (node.y || 0) * centerForce) * 0.88;
-
-        node.x = (node.x || 0) + (node.vx || 0);
-        node.y = (node.y || 0) + (node.vy || 0);
-      });
 
       ctx.save();
       ctx.translate(cx + transformRef.current.x, cy + transformRef.current.y);
       ctx.scale(transformRef.current.scale, transformRef.current.scale);
 
-      // Draw subtle dot grid pattern on canvas
+      // Subtle background dot grid
       ctx.fillStyle = "#E4E7E2";
-      const dotStep = 36;
-      for (let x = -800; x <= 800; x += dotStep) {
-        for (let y = -800; y <= 800; y += dotStep) {
+      const dotStep = 40;
+      for (let x = -1400; x <= 1400; x += dotStep) {
+        for (let y = -1400; y <= 1400; y += dotStep) {
           ctx.beginPath();
           ctx.arc(x, y, 1, 0, Math.PI * 2);
           ctx.fill();
@@ -455,7 +582,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
         });
       }
 
-      // Draw Thin Neutral Connection Lines
+      // Draw Smooth Curved Connection Lines & Relationship Pills
       links.forEach((link) => {
         const sourceNode = nodes.find((n) => n.id === link.source);
         const targetNode = nodes.find((n) => n.id === link.target);
@@ -471,44 +598,65 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
 
         const isLinkActive =
           activeHighlightNode &&
-          (link.source === activeHighlightNode.id || link.target === activeHighlightNode.id);
+          (link.source === activeHighlightNode.id ||
+            link.target === activeHighlightNode.id);
 
         const isLinkDimmed = activeHighlightNode && !isLinkActive;
 
+        const sx = sourceNode.x || 0;
+        const sy = sourceNode.y || 0;
+        const tx = targetNode.x || 0;
+        const ty = targetNode.y || 0;
+
+        ctx.save();
+        if (isLinkDimmed) {
+          ctx.globalAlpha = 0.15;
+        } else {
+          ctx.globalAlpha = 1;
+        }
+
         ctx.beginPath();
-        ctx.moveTo(sourceNode.x || 0, sourceNode.y || 0);
-        ctx.lineTo(targetNode.x || 0, targetNode.y || 0);
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(tx, ty);
 
         if (isLinkActive) {
-          ctx.strokeStyle = "#225C4D";
-          ctx.lineWidth = 1.8;
+          ctx.strokeStyle = "#1E5E4E";
+          ctx.lineWidth = 2.2;
         } else {
-          ctx.strokeStyle = isLinkDimmed ? "#F0F2EE" : "#DCE0D9";
-          ctx.lineWidth = 1.1;
+          ctx.strokeStyle = "#DCE0D9";
+          ctx.lineWidth = 1.3;
         }
         ctx.stroke();
 
-        if (isLinkActive) {
-          const midX = ((sourceNode.x || 0) + (targetNode.x || 0)) / 2;
-          const midY = ((sourceNode.y || 0) + (targetNode.y || 0)) / 2;
+        // Draw Relationship Tag on hover or active link
+        if (isLinkActive || transformRef.current.scale > 0.95) {
+          const midX = (sx + tx) / 2;
+          const midY = (sy + ty) / 2;
 
           ctx.font = "600 9.5px 'JetBrains Mono', monospace";
           const textWidth = ctx.measureText(link.label).width;
+          const pillW = textWidth + 10;
+          const pillH = 16;
 
           ctx.fillStyle = "#FFFFFF";
-          ctx.fillRect(midX - textWidth / 2 - 4, midY - 7, textWidth + 8, 14);
-          ctx.strokeStyle = "#BCD8CF";
-          ctx.lineWidth = 1;
-          ctx.strokeRect(midX - textWidth / 2 - 4, midY - 7, textWidth + 8, 14);
+          ctx.beginPath();
+          ctx.roundRect(midX - pillW / 2, midY - pillH / 2, pillW, pillH, 4);
+          ctx.fill();
 
-          ctx.fillStyle = "#225C4D";
+          ctx.strokeStyle = isLinkActive ? "#9BC5B7" : "#DCE0D9";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+
+          ctx.fillStyle = isLinkActive ? "#1E5E4E" : "#5F6864";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           ctx.fillText(link.label, midX, midY);
         }
+
+        ctx.restore();
       });
 
-      // Draw Nodes (Simple circles/pills, readable dark text)
+      // Draw Modern Pill/Capsule Nodes with Icons & Badges
       nodes.forEach((node) => {
         const isFiltered = activeFilter !== "ALL" && node.type !== activeFilter;
         const isFocused = activeHighlightNode && connectedNodeIds.has(node.id);
@@ -517,45 +665,97 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
         const isHovered = hoveredNode?.id === node.id;
 
         const cfg = TYPE_CONFIG[node.type] || TYPE_CONFIG.Developer;
-        const radius = (node.radius || 18) * (isHovered || isSelected ? 1.12 : 1);
-
         const nx = node.x || 0;
         const ny = node.y || 0;
 
         ctx.save();
         if (isFiltered || isDimmed) {
-          ctx.globalAlpha = 0.22;
+          ctx.globalAlpha = 0.2;
         } else {
           ctx.globalAlpha = 1;
         }
 
-        // Inner Circle
-        ctx.beginPath();
-        ctx.arc(nx, ny, radius, 0, Math.PI * 2);
+        // Measure Label
+        const displayName = node.name;
+        ctx.font = "600 12.5px 'Inter', sans-serif";
+        const labelWidth = ctx.measureText(displayName).width;
+
+        // Card Pill Dimensions
+        const pillWidth = Math.max(labelWidth + 48, 100);
+        const pillHeight = 36;
+        const pillRadius = 8;
+
+        const left = nx - pillWidth / 2;
+        const top = ny - pillHeight / 2;
+
+        // Node Drop Shadow (Subtle modern lift)
+        if (isSelected || isHovered) {
+          ctx.shadowColor = "rgba(0, 0, 0, 0.14)";
+          ctx.shadowBlur = 12;
+          ctx.shadowOffsetY = 4;
+        } else {
+          ctx.shadowColor = "rgba(0, 0, 0, 0.05)";
+          ctx.shadowBlur = 4;
+          ctx.shadowOffsetY = 1;
+        }
+
+        // Card Background Fill
         ctx.fillStyle = cfg.bg;
+        ctx.beginPath();
+        ctx.roundRect(left, top, pillWidth, pillHeight, pillRadius);
         ctx.fill();
 
-        // Border
+        // Reset shadow for border & text
+        ctx.shadowColor = "transparent";
+
+        // Card Border
         ctx.lineWidth = isSelected || isHovered ? 2 : 1.2;
         ctx.strokeStyle = isSelected || isHovered ? cfg.color : cfg.border;
         ctx.stroke();
 
-        // Node Label (Dark charcoal text)
-        ctx.font = `600 ${isHovered || isSelected ? "11.5px" : "11px"} 'Inter', sans-serif`;
-        ctx.fillStyle = "#121816";
+        // Left Icon Badge Box
+        const iconBoxSize = 24;
+        const iconBoxX = left + 6;
+        const iconBoxY = top + 6;
+
+        ctx.fillStyle = "#FFFFFF";
+        ctx.beginPath();
+        ctx.roundRect(iconBoxX, iconBoxY, iconBoxSize, iconBoxSize, 4);
+        ctx.fill();
+        ctx.strokeStyle = cfg.border;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Icon Emoji / Symbol
+        ctx.font = "12px sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
+        ctx.fillText(cfg.icon, iconBoxX + iconBoxSize / 2, iconBoxY + iconBoxSize / 2 + 1);
 
-        let label = node.name;
-        if (label.length > 14 && !isHovered && !isSelected) {
-          label = label.substring(0, 12) + "…";
-        }
-        ctx.fillText(label, nx, ny);
+        // Node Label Text (Charcoal)
+        ctx.font = `600 ${isSelected || isHovered ? "12.5px" : "12px"} 'Inter', sans-serif`;
+        ctx.fillStyle = "#121816";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(displayName, left + 36, top + pillHeight / 2 - 1);
 
-        // Subtitle Type Tag below
-        ctx.font = "600 9px 'Inter', sans-serif";
+        // Micro Type Badge on Top Edge
+        const badgeText = cfg.badge;
+        ctx.font = "700 8.5px 'JetBrains Mono', monospace";
+        const badgeW = ctx.measureText(badgeText).width + 8;
+        const badgeH = 13;
+        const badgeX = left + pillWidth - badgeW - 6;
+        const badgeY = top - 6;
+
         ctx.fillStyle = cfg.color;
-        ctx.fillText(node.type, nx, ny + radius + 12);
+        ctx.beginPath();
+        ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 3);
+        ctx.fill();
+
+        ctx.fillStyle = "#FFFFFF";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(badgeText, badgeX + badgeW / 2, badgeY + badgeH / 2);
 
         ctx.restore();
       });
@@ -570,7 +770,14 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-  }, [activeFilter, hoveredNode, selectedNode]);
+  }, [
+    activeFilter,
+    hoveredNode,
+    selectedNode,
+    isPhysicsRunning,
+    layoutMode,
+    spacingMultiplier,
+  ]);
 
   // Resize handler
   useEffect(() => {
@@ -579,12 +786,13 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
         canvasRef.current.width = containerRef.current.clientWidth;
         canvasRef.current.height =
           typeof height === "number" ? height : containerRef.current.clientHeight;
+        handleFitView();
       }
     };
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [height]);
+  }, [height, handleFitView]);
 
   const getCanvasCoords = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -611,10 +819,17 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
     (worldX: number, worldY: number): GraphNode | null => {
       for (let i = simNodesRef.current.length - 1; i >= 0; i--) {
         const n = simNodesRef.current[i];
-        const dx = worldX - (n.x || 0);
-        const dy = worldY - (n.y || 0);
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist <= (n.radius || 18) + 4) {
+        const nx = n.x || 0;
+        const ny = n.y || 0;
+        const pillWidth = 140;
+        const pillHeight = 40;
+
+        if (
+          worldX >= nx - pillWidth / 2 &&
+          worldX <= nx + pillWidth / 2 &&
+          worldY >= ny - pillHeight / 2 &&
+          worldY <= ny + pillHeight / 2
+        ) {
           return n;
         }
       }
@@ -672,23 +887,18 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
 
   const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
     e.preventDefault();
-    const zoomFactor = e.deltaY < 0 ? 1.06 : 0.94;
+    const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
     transformRef.current.scale = Math.min(
-      Math.max(transformRef.current.scale * zoomFactor, 0.4),
-      2.5
+      Math.max(transformRef.current.scale * zoomFactor, 0.35),
+      2.8
     );
   };
 
   const handleZoom = (delta: number) => {
     transformRef.current.scale = Math.min(
-      Math.max(transformRef.current.scale + delta, 0.4),
-      2.5
+      Math.max(transformRef.current.scale + delta, 0.35),
+      2.8
     );
-  };
-
-  const handleResetView = () => {
-    transformRef.current = { x: 0, y: 0, scale: 0.95 };
-    setSelectedNode(null);
   };
 
   const handleSearchSelect = (nodeName: string) => {
@@ -698,9 +908,9 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
     if (target) {
       setSelectedNode(target);
       transformRef.current = {
-        x: -(target.x || 0) * transformRef.current.scale,
-        y: -(target.y || 0) * transformRef.current.scale,
-        scale: 1.2,
+        x: -(target.x || 0) * 1.1,
+        y: -(target.y || 0) * 1.1,
+        scale: 1.1,
       };
       setSearchQuery("");
     }
@@ -735,8 +945,9 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
 
   return (
     <div className="graph-wrapper-clean" ref={containerRef}>
-      {/* Top Filter & Action Bar */}
+      {/* Top Controls Toolbar */}
       <div className="graph-top-controls">
+        {/* Category Filters */}
         <div className="graph-filter-tabs">
           {filterOptions.map((type) => (
             <button
@@ -744,18 +955,93 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
               className={`graph-tab-btn ${activeFilter === type ? "active" : ""}`}
               onClick={() => setActiveFilter(type)}
             >
-              {type === "ALL" ? "All" : type}
+              {type === "ALL" ? "All Nodes" : type}
             </button>
           ))}
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <div className="clean-search-input" style={{ width: "180px", padding: "4px 8px" }}>
+        {/* Layout Modes & View Actions */}
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+          {/* Layout Mode Switcher */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              background: "var(--bg-subtle)",
+              padding: "2px",
+              borderRadius: "var(--radius-md)",
+              border: "1px solid var(--border-medium)",
+              gap: "2px",
+            }}
+          >
+            <button
+              onClick={() => setLayoutMode("force")}
+              title="Force Network Layout"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                padding: "4px 8px",
+                borderRadius: "var(--radius-sm)",
+                fontSize: "11.5px",
+                fontWeight: layoutMode === "force" ? 600 : 500,
+                background: layoutMode === "force" ? "var(--bg-surface)" : "transparent",
+                color: layoutMode === "force" ? "var(--accent)" : "var(--text-secondary)",
+                boxShadow: layoutMode === "force" ? "var(--shadow-xs)" : "none",
+              }}
+            >
+              <Network size={13} />
+              <span>Network</span>
+            </button>
+
+            <button
+              onClick={() => setLayoutMode("columns")}
+              title="Structured Columns Layout"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                padding: "4px 8px",
+                borderRadius: "var(--radius-sm)",
+                fontSize: "11.5px",
+                fontWeight: layoutMode === "columns" ? 600 : 500,
+                background: layoutMode === "columns" ? "var(--bg-surface)" : "transparent",
+                color: layoutMode === "columns" ? "var(--accent)" : "var(--text-secondary)",
+                boxShadow: layoutMode === "columns" ? "var(--shadow-xs)" : "none",
+              }}
+            >
+              <Layers size={13} />
+              <span>Pipeline</span>
+            </button>
+
+            <button
+              onClick={() => setLayoutMode("radial")}
+              title="Radial Orbit Layout"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                padding: "4px 8px",
+                borderRadius: "var(--radius-sm)",
+                fontSize: "11.5px",
+                fontWeight: layoutMode === "radial" ? 600 : 500,
+                background: layoutMode === "radial" ? "var(--bg-surface)" : "transparent",
+                color: layoutMode === "radial" ? "var(--accent)" : "var(--text-secondary)",
+                boxShadow: layoutMode === "radial" ? "var(--shadow-xs)" : "none",
+              }}
+            >
+              <Orbit size={13} />
+              <span>Radial</span>
+            </button>
+          </div>
+
+          {/* Quick Node Search */}
+          <div className="clean-search-input" style={{ width: "170px", padding: "4px 8px" }}>
             <Search size={13} color="#7D8884" />
             <input
               type="text"
               className="search-field-native"
-              placeholder="Find node..."
+              placeholder="Find in graph..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => {
@@ -766,26 +1052,47 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
             />
           </div>
 
+          {/* Spacing / Spread Toggle */}
           <button
             className="icon-btn-clean"
-            onClick={() => handleZoom(0.12)}
+            onClick={() =>
+              setSpacingMultiplier((prev) => (prev >= 1.8 ? 1.0 : prev + 0.4))
+            }
+            title={`Adjust Graph Spacing (Currently ${spacingMultiplier.toFixed(1)}x)`}
+          >
+            <Sliders size={13} />
+          </button>
+
+          {/* Physics Play/Pause */}
+          <button
+            className="icon-btn-clean"
+            onClick={() => setIsPhysicsRunning((r) => !r)}
+            title={isPhysicsRunning ? "Pause Physics Simulation" : "Resume Physics"}
+          >
+            {isPhysicsRunning ? <Pause size={13} /> : <Play size={13} />}
+          </button>
+
+          {/* Zoom Buttons */}
+          <button
+            className="icon-btn-clean"
+            onClick={() => handleZoom(0.14)}
             title="Zoom In"
           >
-            <ZoomIn size={14} />
+            <ZoomIn size={13} />
           </button>
           <button
             className="icon-btn-clean"
-            onClick={() => handleZoom(-0.12)}
+            onClick={() => handleZoom(-0.14)}
             title="Zoom Out"
           >
-            <ZoomOut size={14} />
+            <ZoomOut size={13} />
           </button>
           <button
             className="icon-btn-clean"
-            onClick={handleResetView}
-            title="Reset View"
+            onClick={handleFitView}
+            title="Fit Graph to View"
           >
-            <RotateCcw size={14} />
+            <Maximize2 size={13} />
           </button>
         </div>
       </div>
@@ -809,7 +1116,8 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
               right: 0,
               bottom: 0,
               width: "310px",
-              background: "var(--bg-surface)",
+              background: "rgba(255, 255, 255, 0.96)",
+              backdropFilter: "blur(12px)",
               borderLeft: "1px solid var(--border-medium)",
               padding: "20px",
               display: "flex",
@@ -818,21 +1126,23 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
               overflowY: "auto",
               boxShadow: "var(--shadow-lg)",
               zIndex: 20,
+              animation: "slide-in 0.2s ease-out",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <span
                 style={{
                   fontSize: "11px",
-                  fontWeight: 600,
-                  padding: "2px 8px",
+                  fontWeight: 700,
+                  padding: "3px 9px",
                   borderRadius: "var(--radius-full)",
                   background: TYPE_CONFIG[selectedNode.type].bg,
                   color: TYPE_CONFIG[selectedNode.type].color,
                   border: `1px solid ${TYPE_CONFIG[selectedNode.type].border}`,
+                  letterSpacing: "0.4px",
                 }}
               >
-                {selectedNode.type}
+                {TYPE_CONFIG[selectedNode.type].icon} {selectedNode.type}
               </span>
 
               <button
@@ -872,11 +1182,11 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
                   color: "#ffffff",
                   fontSize: "12px",
                   fontWeight: 600,
-                  boxShadow: "0 1px 3px rgba(34, 92, 77, 0.25)",
+                  boxShadow: "0 1px 3px rgba(30, 94, 78, 0.3)",
                 }}
               >
                 <ExternalLink size={13} />
-                <span>Open Developer Profile</span>
+                <span>Open Full Profile</span>
               </button>
             )}
 
@@ -887,7 +1197,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
                   fontWeight: 600,
                   textTransform: "uppercase",
                   color: "var(--text-muted)",
-                  letterSpacing: "0.4px",
+                  letterSpacing: "0.5px",
                   marginBottom: "8px",
                 }}
               >
@@ -897,7 +1207,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 {selectedNodeConnections.length === 0 ? (
                   <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                    No connections
+                    No direct connections
                   </span>
                 ) : (
                   selectedNodeConnections.map(({ label, node, direction }, idx) => (
@@ -924,7 +1234,9 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
                         }}
                       >
                         <span>{direction === "out" ? `→ ${label}` : `← ${label}`}</span>
-                        <span style={{ color: TYPE_CONFIG[node.type].color, fontWeight: 600 }}>{node.type}</span>
+                        <span style={{ color: TYPE_CONFIG[node.type].color, fontWeight: 700 }}>
+                          {node.type}
+                        </span>
                       </div>
                       <div style={{ fontSize: "12.5px", fontWeight: 600, color: "var(--text-primary)", marginTop: "2px" }}>
                         {node.name}
@@ -938,21 +1250,25 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
         )}
       </div>
 
-      {/* Legend Strip */}
+      {/* Modern Legend Bar */}
       <div className="graph-legend-strip">
-        <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>Legend:</span>
+        <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>Entity Types:</span>
         {(Object.keys(TYPE_CONFIG) as NodeType[]).map((t) => (
           <div key={t} className="legend-chip">
             <span
               className="legend-dot"
               style={{ background: TYPE_CONFIG[t].color }}
             />
-            <span>{t}</span>
+            <span style={{ fontWeight: 500 }}>{t}</span>
           </div>
         ))}
-        <span style={{ marginLeft: "auto", fontFamily: "var(--font-mono)", color: "var(--text-muted)" }}>
-          {rawNodes.length} nodes · {rawLinks.length} connections
-        </span>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "12px", color: "var(--text-muted)", fontSize: "11px" }}>
+          <span>💡 Click & drag nodes to reorganize</span>
+          <span>•</span>
+          <span style={{ fontFamily: "var(--font-mono)" }}>
+            {rawNodes.length} Nodes · {rawLinks.length} Links
+          </span>
+        </div>
       </div>
     </div>
   );
