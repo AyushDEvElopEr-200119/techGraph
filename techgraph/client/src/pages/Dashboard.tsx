@@ -1,4 +1,5 @@
 import React from "react";
+import { Users, FolderGit2, Cpu, Briefcase, ArrowRight } from "lucide-react";
 import type { Developer, Project, Technology, Job } from "../types";
 import { StatCard } from "../components/StatCard";
 import { GraphExplorer } from "../components/GraphExplorer";
@@ -33,13 +34,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <StatCard
           label="Developers"
           value={developers.length}
-          secondaryText="Indexed profiles"
+          icon={Users}
+          secondaryText="Across 4 tech hubs"
           onClick={() => onNavigateTab("developers")}
         />
 
         <StatCard
           label="Projects"
           value={projects.length}
+          icon={FolderGit2}
           secondaryText="Active repositories"
           onClick={() => onNavigateTab("projects")}
         />
@@ -47,6 +50,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <StatCard
           label="Technologies"
           value={technologies.length}
+          icon={Cpu}
           secondaryText="Tracked tech stacks"
           onClick={() => onNavigateTab("technologies")}
         />
@@ -54,6 +58,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <StatCard
           label="Jobs"
           value={jobs.length}
+          icon={Briefcase}
           secondaryText="Open positions"
           onClick={() => onNavigateTab("jobs")}
         />
@@ -81,12 +86,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <button
             onClick={() => onNavigateTab("graph")}
             style={{
-              fontSize: "12px",
-              fontWeight: 500,
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+              fontSize: "12.5px",
+              fontWeight: 600,
               color: "var(--accent)",
             }}
           >
-            View full graph →
+            <span>View full graph</span>
+            <ArrowRight size={13} />
           </button>
         </div>
 
@@ -96,7 +105,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           technologies={technologies}
           jobs={jobs}
           onSelectDeveloper={onSelectDeveloper}
-          height={420}
+          height={430}
         />
       </section>
 
@@ -112,22 +121,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
         >
           <div>
             <h3 style={{ fontSize: "16px", fontWeight: 600, color: "var(--text-primary)" }}>
-              Developers
+              Developer Spotlight
             </h3>
             <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "1px" }}>
-              Recent engineer profiles
+              Engineers with verified graph skill profiles
             </p>
           </div>
 
           <button
             onClick={() => onNavigateTab("developers")}
             style={{
-              fontSize: "12px",
-              fontWeight: 500,
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+              fontSize: "12.5px",
+              fontWeight: 600,
               color: "var(--accent)",
             }}
           >
-            All developers →
+            <span>All developers</span>
+            <ArrowRight size={13} />
           </button>
         </div>
 

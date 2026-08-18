@@ -38,39 +38,39 @@ const TYPE_CONFIG: Record<
   }
 > = {
   Developer: {
-    color: "#2F6F5E",
+    color: "#225C4D",
     bg: "#EBF3F0",
-    border: "#9DC0B7",
+    border: "#BCD8CF",
     radius: 20,
   },
   Skill: {
-    color: "#375368",
-    bg: "#EAF1F5",
-    border: "#A6BED0",
+    color: "#2A526E",
+    bg: "#E8F1F7",
+    border: "#BFD7E6",
     radius: 17,
   },
   Technology: {
-    color: "#53583C",
-    bg: "#EFF1E9",
-    border: "#B8BCA2",
+    color: "#505832",
+    bg: "#F0F3E8",
+    border: "#D1D8C0",
     radius: 18,
   },
   Project: {
-    color: "#824B20",
-    bg: "#F8EFE7",
-    border: "#D6B598",
+    color: "#7D4314",
+    bg: "#FAF0E6",
+    border: "#E8CFBA",
     radius: 19,
   },
   Company: {
-    color: "#544A63",
-    bg: "#F1EFF4",
-    border: "#B6ADC4",
+    color: "#504462",
+    bg: "#F2EFF7",
+    border: "#D3C9E2",
     radius: 18,
   },
   Job: {
-    color: "#783838",
-    bg: "#F7ECEC",
-    border: "#CCA6A6",
+    color: "#752E2E",
+    bg: "#F9EDED",
+    border: "#E5C3C3",
     radius: 19,
   },
 };
@@ -358,7 +358,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
       const cx = width / 2;
       const cy = height / 2;
 
-      // Clean pure white canvas background
+      // Clean canvas background
       ctx.fillStyle = "#FFFFFF";
       ctx.fillRect(0, 0, width, height);
 
@@ -434,6 +434,17 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
       ctx.translate(cx + transformRef.current.x, cy + transformRef.current.y);
       ctx.scale(transformRef.current.scale, transformRef.current.scale);
 
+      // Draw subtle dot grid pattern on canvas
+      ctx.fillStyle = "#E4E7E2";
+      const dotStep = 36;
+      for (let x = -800; x <= 800; x += dotStep) {
+        for (let y = -800; y <= 800; y += dotStep) {
+          ctx.beginPath();
+          ctx.arc(x, y, 1, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
       const activeHighlightNode = hoveredNode || selectedNode;
       const connectedNodeIds = new Set<string>();
       if (activeHighlightNode) {
@@ -469,11 +480,11 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
         ctx.lineTo(targetNode.x || 0, targetNode.y || 0);
 
         if (isLinkActive) {
-          ctx.strokeStyle = "#2F6F5E";
+          ctx.strokeStyle = "#225C4D";
           ctx.lineWidth = 1.8;
         } else {
-          ctx.strokeStyle = isLinkDimmed ? "#ECEAE4" : "#D9DAD5";
-          ctx.lineWidth = 1.0;
+          ctx.strokeStyle = isLinkDimmed ? "#F0F2EE" : "#DCE0D9";
+          ctx.lineWidth = 1.1;
         }
         ctx.stroke();
 
@@ -481,16 +492,16 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
           const midX = ((sourceNode.x || 0) + (targetNode.x || 0)) / 2;
           const midY = ((sourceNode.y || 0) + (targetNode.y || 0)) / 2;
 
-          ctx.font = "500 9.5px 'JetBrains Mono', monospace";
+          ctx.font = "600 9.5px 'JetBrains Mono', monospace";
           const textWidth = ctx.measureText(link.label).width;
 
           ctx.fillStyle = "#FFFFFF";
-          ctx.fillRect(midX - textWidth / 2 - 3, midY - 6, textWidth + 6, 12);
-          ctx.strokeStyle = "#D9DAD5";
+          ctx.fillRect(midX - textWidth / 2 - 4, midY - 7, textWidth + 8, 14);
+          ctx.strokeStyle = "#BCD8CF";
           ctx.lineWidth = 1;
-          ctx.strokeRect(midX - textWidth / 2 - 3, midY - 6, textWidth + 6, 12);
+          ctx.strokeRect(midX - textWidth / 2 - 4, midY - 7, textWidth + 8, 14);
 
-          ctx.fillStyle = "#2F6F5E";
+          ctx.fillStyle = "#225C4D";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           ctx.fillText(link.label, midX, midY);
@@ -506,14 +517,14 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
         const isHovered = hoveredNode?.id === node.id;
 
         const cfg = TYPE_CONFIG[node.type] || TYPE_CONFIG.Developer;
-        const radius = (node.radius || 18) * (isHovered || isSelected ? 1.1 : 1);
+        const radius = (node.radius || 18) * (isHovered || isSelected ? 1.12 : 1);
 
         const nx = node.x || 0;
         const ny = node.y || 0;
 
         ctx.save();
         if (isFiltered || isDimmed) {
-          ctx.globalAlpha = 0.25;
+          ctx.globalAlpha = 0.22;
         } else {
           ctx.globalAlpha = 1;
         }
@@ -525,13 +536,13 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
         ctx.fill();
 
         // Border
-        ctx.lineWidth = isSelected || isHovered ? 2 : 1;
+        ctx.lineWidth = isSelected || isHovered ? 2 : 1.2;
         ctx.strokeStyle = isSelected || isHovered ? cfg.color : cfg.border;
         ctx.stroke();
 
         // Node Label (Dark charcoal text)
         ctx.font = `600 ${isHovered || isSelected ? "11.5px" : "11px"} 'Inter', sans-serif`;
-        ctx.fillStyle = "#202321";
+        ctx.fillStyle = "#121816";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
 
@@ -542,9 +553,9 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
         ctx.fillText(label, nx, ny);
 
         // Subtitle Type Tag below
-        ctx.font = "500 9px 'Inter', sans-serif";
+        ctx.font = "600 9px 'Inter', sans-serif";
         ctx.fillStyle = cfg.color;
-        ctx.fillText(node.type, nx, ny + radius + 11);
+        ctx.fillText(node.type, nx, ny + radius + 12);
 
         ctx.restore();
       });
@@ -740,7 +751,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
 
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <div className="clean-search-input" style={{ width: "180px", padding: "4px 8px" }}>
-            <Search size={13} color="#6B706C" />
+            <Search size={13} color="#7D8884" />
             <input
               type="text"
               className="search-field-native"
@@ -797,7 +808,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
               top: 0,
               right: 0,
               bottom: 0,
-              width: "300px",
+              width: "310px",
               background: "var(--bg-surface)",
               borderLeft: "1px solid var(--border-medium)",
               padding: "20px",
@@ -805,6 +816,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
               flexDirection: "column",
               gap: "14px",
               overflowY: "auto",
+              boxShadow: "var(--shadow-lg)",
               zIndex: 20,
             }}
           >
@@ -813,8 +825,8 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
                 style={{
                   fontSize: "11px",
                   fontWeight: 600,
-                  padding: "2px 7px",
-                  borderRadius: "var(--radius-sm)",
+                  padding: "2px 8px",
+                  borderRadius: "var(--radius-full)",
                   background: TYPE_CONFIG[selectedNode.type].bg,
                   color: TYPE_CONFIG[selectedNode.type].color,
                   border: `1px solid ${TYPE_CONFIG[selectedNode.type].border}`,
@@ -833,7 +845,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
             </div>
 
             <div>
-              <h3 style={{ fontSize: "16px", fontWeight: 700, color: "var(--text-primary)" }}>
+              <h3 style={{ fontSize: "16px", fontWeight: 700, color: "var(--text-primary)", letterSpacing: "-0.2px" }}>
                 {selectedNode.name}
               </h3>
               {selectedNode.subtitle && (
@@ -854,12 +866,13 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
                   alignItems: "center",
                   justifyContent: "center",
                   gap: "6px",
-                  padding: "7px 12px",
-                  borderRadius: "var(--radius-sm)",
+                  padding: "8px 12px",
+                  borderRadius: "var(--radius-md)",
                   background: "var(--accent)",
                   color: "#ffffff",
                   fontSize: "12px",
                   fontWeight: 600,
+                  boxShadow: "0 1px 3px rgba(34, 92, 77, 0.25)",
                 }}
               >
                 <ExternalLink size={13} />
@@ -874,6 +887,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
                   fontWeight: 600,
                   textTransform: "uppercase",
                   color: "var(--text-muted)",
+                  letterSpacing: "0.4px",
                   marginBottom: "8px",
                 }}
               >
@@ -891,24 +905,26 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
                       key={idx}
                       onClick={() => setSelectedNode(node)}
                       style={{
-                        padding: "8px 10px",
-                        borderRadius: "var(--radius-sm)",
-                        background: "var(--bg-main)",
+                        padding: "9px 12px",
+                        borderRadius: "var(--radius-md)",
+                        background: "var(--bg-subtle)",
                         border: "1px solid var(--border-medium)",
                         cursor: "pointer",
+                        boxShadow: "var(--shadow-xs)",
+                        transition: "all var(--transition-fast)",
                       }}
                     >
                       <div
                         style={{
                           display: "flex",
                           justifyContent: "space-between",
-                          fontSize: "10px",
+                          fontSize: "10.5px",
                           fontFamily: "var(--font-mono)",
                           color: "var(--text-muted)",
                         }}
                       >
                         <span>{direction === "out" ? `→ ${label}` : `← ${label}`}</span>
-                        <span style={{ color: TYPE_CONFIG[node.type].color }}>{node.type}</span>
+                        <span style={{ color: TYPE_CONFIG[node.type].color, fontWeight: 600 }}>{node.type}</span>
                       </div>
                       <div style={{ fontSize: "12.5px", fontWeight: 600, color: "var(--text-primary)", marginTop: "2px" }}>
                         {node.name}
@@ -934,7 +950,7 @@ export const GraphExplorer: React.FC<GraphExplorerProps> = ({
             <span>{t}</span>
           </div>
         ))}
-        <span style={{ marginLeft: "auto", fontFamily: "var(--font-mono)" }}>
+        <span style={{ marginLeft: "auto", fontFamily: "var(--font-mono)", color: "var(--text-muted)" }}>
           {rawNodes.length} nodes · {rawLinks.length} connections
         </span>
       </div>

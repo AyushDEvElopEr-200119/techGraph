@@ -22,9 +22,9 @@ const driver = neo4j.driver(
 const developers = [
   {
     id: "dev-001",
-    name: "Ayush Sharma",
-    email: "ayush@example.com",
-    experience: 2,
+    name: "Ayush Srivastava",
+    email: "ayushkrsrivastava12@gmail.com",
+    experience: 3.5,
     location: "Bengaluru",
   },
   {

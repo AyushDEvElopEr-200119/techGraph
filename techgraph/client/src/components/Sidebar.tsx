@@ -75,13 +75,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}>
       <div className="sidebar-header">
+        <div className="logo-icon-box">
+          <Share2 size={18} strokeWidth={2.4} />
+        </div>
         <div className="sidebar-brand">
-          <h1>TECHGRAPH</h1>
-          <p>Graph-powered<br />developer intelligence</p>
+          <h1>
+            TECHGRAPH
+            <span className="sidebar-brand-badge">V2</span>
+          </h1>
+          <p>Developer Intelligence</p>
         </div>
       </div>
 
       <nav className="sidebar-nav">
+        <div className="nav-section-heading">Workspace</div>
+
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -114,8 +122,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               health.status === "ok" ? "" : "error"
             }`}
           />
-          <span>
-            {health.status === "ok" ? "API Connected" : "API Connecting"}
+          <span style={{ fontWeight: 500 }}>
+            {health.status === "ok" ? "API Connected" : "API Connecting..."}
           </span>
         </div>
       </div>
